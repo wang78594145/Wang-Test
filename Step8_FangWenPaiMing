@@ -1,0 +1,91 @@
+import java.io.IOException;
+import java.net.URI;
+import java.util.ArrayList;
+import java.util.Set;
+import java.util.TreeMap;
+
+import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.io.LongWritable;
+import org.apache.hadoop.io.NullWritable;
+import org.apache.hadoop.io.Text;
+import org.apache.hadoop.mapreduce.Job;
+import org.apache.hadoop.mapreduce.Mapper;
+import org.apache.hadoop.mapreduce.Reducer;
+import org.apache.hadoop.mapreduce.lib.input.FileInputFormat;
+import org.apache.hadoop.mapreduce.lib.output.FileOutputFormat;
+
+
+
+public class Step8_FangWenPaiMing {
+	public static class Step8_Map extends Mapper<LongWritable, Text, Text, Text>{
+		@Override
+		protected void map(LongWritable key, Text value, Mapper<LongWritable, Text, Text, Text>.Context context)
+				throws IOException, InterruptedException {
+			String[] lines=value.toString().split("\\|", -1);
+			if(lines.length==3) {
+				String actionId=lines[1];
+				String userId=lines[0];
+				String fangwenCount=lines[2].trim();
+				context.write(new Text(userId), new Text(actionId+"|"+fangwenCount+"|"+userId));
+				
+				
+				
+			}
+		}
+	}
+	public static class Step8_Reduce extends Reducer<Text, Text, Text, NullWritable>{
+		@Override
+		protected void reduce(Text key, Iterable<Text> values, Context context)
+				throws IOException, InterruptedException {
+			TreeMap map=new TreeMap<Integer, String>();
+			int count=0;
+			for(Text value:values) {
+				
+					String[] valueSplits=value.toString().split("\\|",-1);
+					if(valueSplits.length==3) {
+					int value_FangwenCount=Integer.parseInt(valueSplits[1]);
+					String actionId=valueSplits[0];
+					String userId=valueSplits[2];
+					map.put(value_FangwenCount,actionId+"|"+userId+"|"+value_FangwenCount+"|");
+				
+				}
+				
+			}
+			Set outputValue=map.keySet();
+			
+			for (Object object : outputValue) {
+				count++;
+				if(count<=5) {
+				
+				context.write(new Text(map.get(object).toString()+count), null);
+			}
+			}
+		}
+	}
+	public static void main(String[] args) throws IOException {
+		Configuration conf =new Configuration();
+		conf.set("fs.defaultFS", "hdfs://192.168.44.22:9000");
+		Job job=Job.getInstance(conf);
+		job.setJarByClass(Step8_FangWenPaiMing.class);
+		job.setMapperClass(Step8_Map.class);
+		job.setMapOutputKeyClass(Text.class);
+		job.setMapOutputValueClass(Text.class);
+		job.setReducerClass(Step8_Reduce.class);
+		job.setOutputKeyClass(Text.class);
+		job.setOutputValueClass(NullWritable.class);
+		FileInputFormat.setInputPaths(job, new Path("file:\\E:\\output\\three_worldcount"));
+		FileOutputFormat.setOutputPath(job, new Path("file:\\E:\\output\\Step8_FangWenPaiMing"));
+		try {
+			job.waitForCompletion(true);
+		} catch (ClassNotFoundException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		} catch (InterruptedException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
+		
+	}
+
+}
