@@ -1,0 +1,63 @@
+import java.io.IOException;
+
+import org.apache.commons.lang.StringUtils;
+import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.io.IntWritable;
+import org.apache.hadoop.io.LongWritable;
+import org.apache.hadoop.io.Text;
+import org.apache.hadoop.mapreduce.Job;
+import org.apache.hadoop.mapreduce.Mapper;
+import org.apache.hadoop.mapreduce.Reducer;
+import org.apache.hadoop.mapreduce.lib.input.FileInputFormat;
+import org.apache.hadoop.mapreduce.lib.output.FileOutputFormat;
+
+public class Step3_WorlCount {
+	static class Step3_Map extends Mapper<LongWritable, Text, Text, IntWritable>{
+		@Override
+		protected void map(LongWritable key, Text value, Context context)
+				throws IOException, InterruptedException {
+			String lines[]=StringUtils.split(value.toString(),"\\|");
+			String num_actionId_yijiyuming=lines[0].toString().substring(0, 6)+"000000000000";
+			String userId=lines[1];
+			String newKey=userId+"|"+num_actionId_yijiyuming;
+			context.write(new Text(newKey),new IntWritable(1));
+		}
+	}
+	static class Step_Reduce extends Reducer<Text, IntWritable,Text,Text>{
+		@Override
+		protected void reduce(Text key, Iterable<IntWritable> values,
+				Context context) throws IOException, InterruptedException {
+			int count=0;
+			for(IntWritable num:values) {
+				count++;
+				
+			}
+			context.write(new Text(key.toString()+"|"+count),new Text(""));
+		}
+	}
+	public static void main(String[] args) throws IOException {
+		Configuration conf=new Configuration();
+		conf.set("fs.defaultFS", "hdfs://192.168.44.22:9000");
+		Job job=Job.getInstance(conf);
+		job.setJarByClass(Step3_WorlCount.class);
+		job.setMapperClass(Step3_Map.class);
+		job.setMapOutputKeyClass(Text.class);
+		job.setMapOutputValueClass(IntWritable.class);
+		job.setReducerClass(Step_Reduce.class);
+		job.setOutputKeyClass(Text.class);
+		job.setOutputValueClass(IntWritable.class);
+		FileInputFormat.setInputPaths(job,new Path("file:\\E:\\output\\three_worldcount2"));
+		FileOutputFormat.setOutputPath(job, new Path("file:/E:/output/three_worldcount2/"));
+		try {
+			job.waitForCompletion(true);
+		} catch (ClassNotFoundException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		} catch (InterruptedException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
+		}
+
+}
