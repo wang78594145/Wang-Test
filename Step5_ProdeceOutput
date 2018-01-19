@@ -1,0 +1,98 @@
+import java.io.BufferedReader;
+import java.io.FileReader;
+import java.io.IOException;
+import java.net.URI;
+import java.net.URISyntaxException;
+import java.util.HashMap;
+
+import org.apache.commons.lang.StringUtils;
+import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.io.LongWritable;
+import org.apache.hadoop.io.Text;
+
+import org.apache.hadoop.mapreduce.Job;
+import org.apache.hadoop.mapreduce.Mapper;
+import org.apache.hadoop.mapreduce.lib.input.FileInputFormat;
+import org.apache.hadoop.mapreduce.lib.output.FileOutputFormat;
+
+
+
+
+public class Step5_ProdeceOutput {
+	
+	
+	public static HashMap fillterData=new HashMap();
+	
+	
+	
+	static class Step5_Map extends Mapper<LongWritable, Text, Text, Text>{
+		@Override
+		protected void setup(Mapper<LongWritable, Text, Text, Text>.Context context)
+				throws IOException, InterruptedException {
+			BufferedReader reader=new BufferedReader(new FileReader("E:\\output\\step2\\step2"));
+			
+			String str="";
+			while((str=reader.readLine())!=null) {
+				String[] line=str.split("\\|");
+				String tfbuy=line[4];
+				String userId=line[1];
+				String actionId=line[0];
+				
+				if(!tfbuy.equals("0")) {
+					fillterData.put(actionId,userId);
+					
+					
+				}else {
+					continue;
+				}
+				
+			}
+		}
+		@Override
+		protected void map(LongWritable key, Text value, Context context)
+				throws IOException, InterruptedException {
+			// TODO Auto-generated method stub
+			//System.out.println("111111111111111111");
+			String lines[]=StringUtils.split(value.toString(), "\\|");
+			if(lines.length==9) {
+				String actionId=lines[0];
+				String productType=lines[1];
+				String productId=lines[2];
+				String productNum1=lines[3];
+				String productNum2=lines[4];
+				String productNum3=lines[5];
+				String productNum4=lines[6];
+				String productNum5=lines[7];
+				String productNum6=lines[8];
+				if(fillterData.containsKey(actionId)) {
+					context.write(new Text(fillterData.get(actionId)+"|"+productType+"|"+productId+"|"+productNum1+"|"+productNum2+"|"
+				                  +productNum3+"|"+productNum4+"|"+productNum5+"|"+productNum6+"|"+actionId),new Text("") );
+				}
+			}
+			
+		}
+	}
+	public static void main(String[] args) throws IOException, URISyntaxException {
+		Configuration conf =new Configuration();
+		conf.set("fs.defaultFS", "hdfs://192.168.44.22:9000");
+		Job job=Job.getInstance(conf);
+		job.setMapperClass(Step5_Map.class);
+		job.setOutputKeyClass(Text.class);
+		job.setOutputValueClass(Text.class);
+		//job.addCacheFile(new URI("file:/c:/input"));
+		FileInputFormat.setInputPaths(job, new Path("file:\\C:\\Users\\Administrator\\Desktop\\Project\\项目资料\\数据\\配置数据\\t_dx_product_msg_addr.txt"));
+		FileOutputFormat.setOutputPath(job, new Path("file:\\E:\\output\\Step5_ProdeceOutput"));
+		try {
+			job.waitForCompletion(true);
+		} catch (ClassNotFoundException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		} catch (InterruptedException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
+	}
+	
+
+}
