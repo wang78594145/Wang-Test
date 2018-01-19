@@ -1,0 +1,78 @@
+import java.io.BufferedReader;
+import java.io.FileReader;
+import java.io.IOException;
+import java.net.URI;
+import java.net.URISyntaxException;
+import java.util.HashMap;
+
+import org.apache.commons.lang.StringUtils;
+import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.io.IntWritable;
+import org.apache.hadoop.io.LongWritable;
+import org.apache.hadoop.io.NullWritable;
+import org.apache.hadoop.io.Text;
+import org.apache.hadoop.mapreduce.Job;
+import org.apache.hadoop.mapreduce.Mapper;
+import org.apache.hadoop.mapreduce.Reducer;
+import org.apache.hadoop.mapreduce.lib.input.FileInputFormat;
+import org.apache.hadoop.mapreduce.lib.output.FileOutputFormat;
+public class Step7_Product_User_Count {
+	public static class Step7_Map extends Mapper<LongWritable, Text, Text, IntWritable>{
+		@Override
+		protected void map(LongWritable key, Text value, Mapper<LongWritable, Text, Text, IntWritable>.Context context)
+				throws IOException, InterruptedException {
+			String[] lines=StringUtils.split(value.toString(),"\\|");
+			String productId=lines[0];
+			String productType=lines[3];
+			//第六步同一个用户对一个产品的访问次数
+			int user_prudoct_fangwenCount=Integer.parseInt(lines[2]);
+			context.write(new Text(productId+"|"+productType),new IntWritable(user_prudoct_fangwenCount));
+		}
+		
+	}
+	public static class Step7_Reduce extends Reducer<Text, IntWritable, Text, NullWritable>{
+		@Override
+		protected void reduce(Text key, Iterable<IntWritable> values, Context context)
+				throws IOException, InterruptedException {
+			//产品的访问总次数
+			int productFangWen_Count=0;
+			//产品访问的人数
+			int productFangWen_num=0;
+			productFangWen_num++;
+			for(IntWritable value:values) {
+				productFangWen_Count+=value.get();
+			}
+			String key_Splits[]=key.toString().split("\\|", -1);
+			String productId=key_Splits[0];
+			String productType=key_Splits[1];
+			context.write(new Text(productId+"|"+productFangWen_num+"|"+productFangWen_Count), null);
+		}
+		
+	}
+	public static void main(String[] args) throws IOException, URISyntaxException {
+		Configuration conf =new Configuration();
+		conf.set("fs.defaultFS", "hdfs://192.168.44.22:9000");
+		Job job=Job.getInstance(conf);
+		job.setJarByClass(Step7_Product_User_Count.class);
+		job.setMapperClass(Step7_Map.class);
+		job.setMapOutputKeyClass(Text.class);
+		job.setMapOutputValueClass(IntWritable.class);
+		job.setReducerClass(Step7_Reduce.class);
+		job.setOutputKeyClass(Text.class);
+		
+		job.setOutputValueClass(NullWritable.class);
+		FileInputFormat.setInputPaths(job, new Path("file:\\E:\\output\\Step6_Product_Count_Output"));
+		FileOutputFormat.setOutputPath(job, new Path("file:\\E:\\output\\Step7_Product_User_Count"));
+		try {
+			job.waitForCompletion(true);
+		} catch (ClassNotFoundException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		} catch (InterruptedException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
+	}
+
+}
