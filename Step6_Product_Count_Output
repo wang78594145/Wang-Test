@@ -1,0 +1,66 @@
+import java.io.IOException;
+import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.io.IntWritable;
+import org.apache.hadoop.io.LongWritable;
+import org.apache.hadoop.io.NullWritable;
+import org.apache.hadoop.io.Text;
+import org.apache.hadoop.mapreduce.Job;
+import org.apache.hadoop.mapreduce.Mapper;
+import org.apache.hadoop.mapreduce.Reducer;
+import org.apache.hadoop.mapreduce.lib.input.FileInputFormat;
+import org.apache.hadoop.mapreduce.lib.output.FileOutputFormat;
+
+
+//访问每种产品次数的统计
+public class Step6_Product_Count_Output {
+	public static class Step6_Map extends Mapper<LongWritable,Text,Text,Text>{
+		
+	    protected void map(LongWritable key, Text value, Context context) throws IOException, InterruptedException {
+	        String[] lines =value.toString().split("\\|", -1);
+	        String userId=lines[0];
+	        String productId=lines[2];
+	        String productType=lines[1];
+	        context.write(new Text(productId+"|"+userId),new Text(productType));
+	    }
+	    
+		
+	}
+	public static class Step6_Reduce extends Reducer<Text, Text, Text, NullWritable>{
+		
+	    protected void reduce(Text key, Iterable<Text> values, Context context) throws IOException, InterruptedException {
+	        int fangwenCount=0;
+	        String productType="";
+	        for (Text value : values){
+	        	fangwenCount++;
+	            productType=value.toString();
+	        }
+	        context.write(new Text(key.toString()+"|"+fangwenCount+"|"+productType),null);
+	    }
+
+	}
+	public static void main(String[] args) throws IOException {
+		Configuration conf =new Configuration();
+		conf.set("fs.defaultFS", "hdfs://192.168.44.22:9000");
+		Job job=Job.getInstance(conf);
+		job.setJarByClass(Step6_Product_Count_Output.class);
+		job.setMapperClass(Step6_Map.class);
+		job.setMapOutputKeyClass(Text.class);
+		job.setMapOutputValueClass(Text.class);
+		job.setReducerClass(Step6_Reduce.class);
+		job.setOutputKeyClass(Text.class);
+		job.setOutputValueClass(NullWritable.class);
+		FileInputFormat.setInputPaths(job, new Path("file:\\E:\\output\\Step5_ProdeceOutput"));
+		FileOutputFormat.setOutputPath(job, new Path("file:\\E:\\output\\Step6_Product_Count_Output"));
+		try {
+			job.waitForCompletion(true);
+		} catch (ClassNotFoundException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		} catch (InterruptedException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
+	}
+
+}
