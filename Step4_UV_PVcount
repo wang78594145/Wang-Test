@@ -1,0 +1,76 @@
+import java.io.IOException;
+
+import org.apache.commons.lang.StringUtils;
+import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.io.IntWritable;
+import org.apache.hadoop.io.LongWritable;
+import org.apache.hadoop.io.Text;
+import org.apache.hadoop.mapreduce.Job;
+import org.apache.hadoop.mapreduce.Mapper;
+import org.apache.hadoop.mapreduce.Reducer;
+import org.apache.hadoop.mapreduce.lib.input.FileInputFormat;
+import org.apache.hadoop.mapreduce.lib.output.FileOutputFormat;
+
+
+
+public class Step4_UV_PVcount {
+	static class Step4_Map extends Mapper<LongWritable, Text, Text, Text>{
+		@Override
+		protected void map(LongWritable key, Text value, Context context)
+				throws IOException, InterruptedException {
+			String[] lines=StringUtils.split(value.toString(),"\\|");
+			String actionId=lines[1];
+			String actionCount=lines[2].trim();
+			context.write(new Text(actionId),new Text(actionCount));
+			
+			
+			
+			
+		}
+		static class Step4_Reduce extends Reducer<Text, Text, Text, Text>{
+			@Override
+			protected void reduce(Text key, Iterable<Text> values, Context context)
+					throws IOException, InterruptedException {
+				int uvCount=0;
+				int tvCount=0;
+				for(Text value:values) {
+					uvCount++;
+					int actionCount=Integer.parseInt(value.toString());
+					tvCount+=actionCount;
+				}
+				context.write(new Text(key.toString()+"|"+uvCount+"|"+tvCount),new Text("")  );
+			
+			}
+		}
+		public static void main(String[] args) throws IOException {
+			Configuration conf =new Configuration();
+			conf.set("fs.defaultFS", "hdfs://192.168.44.22:9000");
+			Job job=Job.getInstance(conf);
+			job.setMapperClass(Step4_Map.class);
+			job.setMapOutputKeyClass(Text.class);
+			job.setMapOutputValueClass(Text.class);
+			job.setReducerClass(Step4_Reduce.class);
+			job.setOutputKeyClass(Text.class);
+			job.setOutputValueClass(Text.class);
+			FileInputFormat.setInputPaths(job, new Path("file:\\E:\\output\\three_worldcount2\\step3"));
+			FileOutputFormat.setOutputPath(job, new Path("file:\\E:\\output\\four_actionID_UV_PV"));
+			try {
+				job.waitForCompletion(true);
+			} catch (ClassNotFoundException e) {
+				// TODO Auto-generated catch block
+				e.printStackTrace();
+			} catch (InterruptedException e) {
+				// TODO Auto-generated catch block
+				e.printStackTrace();
+			}
+			
+			
+			
+		}
+		
+		
+	}
+	
+
+}
