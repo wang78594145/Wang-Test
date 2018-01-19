@@ -1,0 +1,134 @@
+import java.io.BufferedReader;
+import java.io.FileReader;
+import java.io.IOException;
+import java.util.ArrayList;
+import java.util.HashMap;
+
+import org.apache.commons.lang.StringUtils;
+import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.io.LongWritable;
+import org.apache.hadoop.io.NullWritable;
+import org.apache.hadoop.io.Text;
+import org.apache.hadoop.mapreduce.Job;
+import org.apache.hadoop.mapreduce.Mapper;
+import org.apache.hadoop.mapreduce.Reducer;
+import org.apache.hadoop.mapreduce.lib.input.FileInputFormat;
+import org.apache.hadoop.mapreduce.lib.output.FileOutputFormat;
+
+
+
+
+
+public class Step9_UserHuaXiang_Output {
+	public static class Step9_Map extends Mapper<LongWritable, Text, Text, Text>{
+		//map 存入《actionid，actionType》
+		public static HashMap<String,String> actionType_actioonId =new HashMap<String,String>();
+		@Override
+		protected void setup(Mapper<LongWritable, Text, Text, Text>.Context context)
+				throws IOException, InterruptedException {
+			BufferedReader br=new BufferedReader(new FileReader("C:\\Users\\Administrator\\Desktop\\Project\\项目资料\\数据\\配置数据\\t_dx_basic_classify_link.txt"));
+			String str="";
+			while((str=br.readLine())!=null) {
+				String[] splits=str.split("\\|");
+				String actionType=splits[0];
+				String actionId=splits[1];
+				actionType_actioonId.put(actionId, actionType);
+			}
+			
+		}
+		@Override
+		protected void map(LongWritable key, Text value, Mapper<LongWritable, Text, Text, Text>.Context context)
+				throws IOException, InterruptedException {
+			String[] lines=StringUtils.split(value.toString(), "\\|");
+			String actionId=lines[0];
+			if(actionType_actioonId.containsKey(actionId)) {
+				
+				String userId=lines[1];
+				
+				int action_FangWenCount=Integer.parseInt(lines[2].trim());
+				context.write(new Text(actionType_actioonId.get(actionId)), new Text(userId+"|"+action_FangWenCount));
+			}
+			
+				
+			}
+			
+		
+	}
+	public static class Step9_Reduce extends Reducer<Text, Text, Text, NullWritable>{
+		@Override
+		protected void reduce(Text key, Iterable<Text> values, Reducer<Text, Text, Text, NullWritable>.Context context)
+				throws IOException, InterruptedException {
+			//将用户ID放在集合中
+			ArrayList<String> userIds=new ArrayList<String>();
+			//将访问次数放在list集合中方便求标准差时用
+			ArrayList<Integer> fangwenCounts_list=new ArrayList<Integer>();
+			
+			int fenLeiZongCount=0;
+			int fangwenCount=0;
+			int n=0;
+			double biaozhuncha=0;
+			
+			for(Text value:values) {
+				n++;
+				String[] line_Value=value.toString().split("\\|");
+				String userId=line_Value[0];
+				fangwenCount=Integer.parseInt(line_Value[1]);
+				fenLeiZongCount+=fangwenCount;
+				fangwenCounts_list.add(fangwenCount);
+				userIds.add(userId);
+			}
+			//平均访问次数
+			double avrage_fangwenCount=fenLeiZongCount/n;
+			double fangcha=0;
+			
+			
+			for(double fangwenCount_bianli:fangwenCounts_list ) {
+				//方差
+				fangcha+=Math.pow(fangwenCount_bianli-avrage_fangwenCount, 2);
+				
+			}
+			
+			//标准差=sqrt((访问次数-平均值)*(访问次数-平均值)/n)
+			biaozhuncha=Math.sqrt(fangcha);
+			
+			//求标准值=访问次数-平均值/标准差
+			double biaozhunzhi=0;
+			int count=0;
+			for(double fangwenCount_bianli:fangwenCounts_list ) {
+				//方差
+				
+				biaozhunzhi=(fangwenCount_bianli-avrage_fangwenCount)/biaozhuncha+5;
+				context.write(new Text(userIds.get(count)+"|"+key.toString()+"|"+fangwenCount+"|"+fenLeiZongCount+"|"+biaozhunzhi
+						), null);
+				count++;
+			}
+			
+			
+		}
+	}
+	public static void main(String[] args) throws IllegalArgumentException, IOException {
+		Configuration conf =new Configuration();
+		conf.set("fs.defaultFS", "hdfs://192.168.44.22:9000");
+		Job job=Job.getInstance(conf);
+		job.setJarByClass(Step9_UserHuaXiang_Output.class);
+		job.setMapperClass(Step9_Map.class);
+		job.setMapOutputKeyClass(Text.class);
+		job.setMapOutputValueClass(Text.class);
+		job.setReducerClass(Step9_Reduce.class);
+		job.setOutputKeyClass(Text.class);
+		job.setOutputValueClass(NullWritable.class);
+		FileInputFormat.setInputPaths(job, new Path("file:\\E:\\output\\three_worldcount\\step3fuwuqi"));
+		FileOutputFormat.setOutputPath(job, new Path("file:\\E:\\output\\Step9_UserHuaXiang_Output"));
+		try {
+			job.waitForCompletion(true);
+		} catch (ClassNotFoundException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		} catch (InterruptedException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
+	}
+
+}
